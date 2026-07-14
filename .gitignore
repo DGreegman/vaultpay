@@ -1,4 +1,4 @@
 .env
-temp/
+tmp/
 bin/
-
+NOTE.md
