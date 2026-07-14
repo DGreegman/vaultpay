@@ -1,0 +1,4 @@
+DROP TYPE IF EXISTS wallet_status;
+DROP TYPE IF EXISTS currency;
+
+DROP EXTENSION IF EXISTS citext;
