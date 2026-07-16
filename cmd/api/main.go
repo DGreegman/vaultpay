@@ -10,6 +10,7 @@ import (
 	"github.com/DGreegman/vaultpay/internal/config"
 	"github.com/DGreegman/vaultpay/internal/db"
 	"github.com/DGreegman/vaultpay/internal/server"
+	"github.com/DGreegman/vaultpay/internal/user"
 )
 
 func main() {
@@ -27,7 +28,10 @@ func main() {
 
 	defer pool.Close()
 
-	srv := server.New(cfg, pool)
+	userRepo := user.NewPostgresRepository(pool)
+	userService := user.NewService(userRepo)
+
+	srv := server.New(cfg, pool, userService)
 
 	// Run the server in a goroutine so main can waiit for signal
 	go func () {

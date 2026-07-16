@@ -1,9 +1,11 @@
 package server
 
 import (
+
 	"github.com/DGreegman/vaultpay/internal/config"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/DGreegman/vaultpay/internal/user"
 )
 
 // Server wraps the Fiber app and its dependencies
@@ -12,12 +14,13 @@ type Server struct {
 	app *fiber.App
 	cfg *config.Config
 	pool *pgxpool.Pool
+	userService *user.Service
 }
 
 // New contructs a server with its routes registered.
 // Dependecies are injected, never reached globally.
 
-func New(cfg *config.Config, pool *pgxpool.Pool) *Server {
+func New(cfg *config.Config, pool *pgxpool.Pool, userService *user.Service) *Server {
 	app := fiber.New(fiber.Config{
 		AppName: 		"VaultPay",
 		DisableStartupMessage: true,
@@ -27,6 +30,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool) *Server {
 		app: app,
 		cfg: cfg,
 		pool: pool,
+		userService: userService,
 	}
 
 	s.registerRoutes()
