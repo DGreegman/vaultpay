@@ -1,11 +1,11 @@
 package server
 
 import (
-
 	"github.com/DGreegman/vaultpay/internal/config"
+	"github.com/DGreegman/vaultpay/internal/user"
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/DGreegman/vaultpay/internal/user"
 )
 
 // Server wraps the Fiber app and its dependencies
@@ -15,6 +15,7 @@ type Server struct {
 	cfg *config.Config
 	pool *pgxpool.Pool
 	userService *user.Service
+	validate *validator.Validate
 }
 
 // New contructs a server with its routes registered.
@@ -26,11 +27,14 @@ func New(cfg *config.Config, pool *pgxpool.Pool, userService *user.Service) *Ser
 		DisableStartupMessage: true,
 	})
 
+	validate := validator.New(validator.WithRequiredStructEnabled())
 	s := &Server{
 		app: app,
 		cfg: cfg,
 		pool: pool,
 		userService: userService,
+		validate: validate,
+
 	}
 
 	s.registerRoutes()
@@ -42,6 +46,11 @@ func New(cfg *config.Config, pool *pgxpool.Pool, userService *user.Service) *Ser
 func(s *Server) registerRoutes() {
 	s.app.Get("/healthz", s.handleHealthz)
 	s.app.Get("/readyz", s.handleReadyz)
+
+	v1 := s.app.Group("/v1")
+
+	auth := v1.Group("/auth")
+	auth.Post("/register", s.handleRegister)
 }
 
 // Listen starts the HTP server. It blocks until the server stops

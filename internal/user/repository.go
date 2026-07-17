@@ -96,9 +96,9 @@ func mapCreateError(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505"{
 		switch pgErr.ConstraintName {
-		case "user_email_key":
+		case "users_email_key":
 			return ErrEmailTaken
-		case "user_phone_key":
+		case "users_phone_key":
 			return ErrPhoneTaken
 		}
 
