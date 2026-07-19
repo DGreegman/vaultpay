@@ -14,6 +14,7 @@ type Config struct{
 	AppEnv		string
 	Port		string
 	DatabaseURL	string
+	JWTSecret	string
 }
 
 
@@ -28,6 +29,7 @@ func Load() (*Config, error) {
 		AppEnv: 		getEnv("APP_ENV", "development"),
 		Port: 			getEnv("PORT", "8080"),
 		DatabaseURL: 	os.Getenv("DATABASE_URL"),
+		JWTSecret: 		os.Getenv("JWT_SECRET"),
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -40,6 +42,9 @@ func Load() (*Config, error) {
 func (c *Config) validate() error {
 	if c.DatabaseURL == "" {
 		return fmt.Errorf("config: DATABASE_URL is required")
+	}
+	if len(c.JWTSecret) < 32 {
+		return fmt.Errorf("config: JWT_SECRET is required and must be at least 32 bytes")
 	}
 	return nil
 }

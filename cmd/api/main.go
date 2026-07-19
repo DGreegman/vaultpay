@@ -10,6 +10,8 @@ import (
 	"github.com/DGreegman/vaultpay/internal/config"
 	"github.com/DGreegman/vaultpay/internal/db"
 	"github.com/DGreegman/vaultpay/internal/server"
+	"github.com/DGreegman/vaultpay/internal/session"
+	"github.com/DGreegman/vaultpay/internal/token"
 	"github.com/DGreegman/vaultpay/internal/user"
 )
 
@@ -30,8 +32,11 @@ func main() {
 
 	userRepo := user.NewPostgresRepository(pool)
 	userService := user.NewService(userRepo)
+	tokenManager := token.NewManager(cfg.JWTSecret)
+	sessionRepo := session.NewPostgresRepository(pool)
+	sessionService := session.NewService(sessionRepo)
 
-	srv := server.New(cfg, pool, userService)
+	srv := server.New(cfg, pool, userService, tokenManager, sessionService)
 
 	// Run the server in a goroutine so main can waiit for signal
 	go func () {

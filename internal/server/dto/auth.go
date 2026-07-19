@@ -24,3 +24,21 @@ type UserResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+
+
+// Login is the body for POST /v1/auth/login.
+type LoginRequest struct {
+	Email    string `json:"email"    validate:"required,email"`
+	Password string `json:"password" validate:"required"`
+}
+
+// TokenResponse carries both tokens back to the client. The access token
+// is a short-lived JWT; the refresh token is the raw opaque string whose
+// hash we stored.
+type TokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int    `json:"expires_in"` // access token lifetime, seconds
+}
+

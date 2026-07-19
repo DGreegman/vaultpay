@@ -2,6 +2,8 @@ package server
 
 import (
 	"github.com/DGreegman/vaultpay/internal/config"
+	"github.com/DGreegman/vaultpay/internal/session"
+	"github.com/DGreegman/vaultpay/internal/token"
 	"github.com/DGreegman/vaultpay/internal/user"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
@@ -15,13 +17,15 @@ type Server struct {
 	cfg *config.Config
 	pool *pgxpool.Pool
 	userService *user.Service
+	tokenManager *token.Manager
+	sessionService *session.Service
 	validate *validator.Validate
 }
 
 // New contructs a server with its routes registered.
 // Dependecies are injected, never reached globally.
 
-func New(cfg *config.Config, pool *pgxpool.Pool, userService *user.Service) *Server {
+func New(cfg *config.Config, pool *pgxpool.Pool, userService *user.Service, tokenmanager *token.Manager, sessionService *session.Service) *Server {
 	app := fiber.New(fiber.Config{
 		AppName: 		"VaultPay",
 		DisableStartupMessage: true,
@@ -33,6 +37,8 @@ func New(cfg *config.Config, pool *pgxpool.Pool, userService *user.Service) *Ser
 		cfg: cfg,
 		pool: pool,
 		userService: userService,
+		tokenManager: tokenmanager,
+		sessionService: sessionService,
 		validate: validate,
 
 	}
@@ -51,6 +57,7 @@ func(s *Server) registerRoutes() {
 
 	auth := v1.Group("/auth")
 	auth.Post("/register", s.handleRegister)
+	auth.Post("/login", s.handleLogin)
 }
 
 // Listen starts the HTP server. It blocks until the server stops
