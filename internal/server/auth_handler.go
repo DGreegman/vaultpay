@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/DGreegman/vaultpay/internal/server/dto"
+	"github.com/DGreegman/vaultpay/internal/session"
 	"github.com/DGreegman/vaultpay/internal/user"
 	"github.com/gofiber/fiber/v2"
 )
@@ -122,5 +123,55 @@ func clientIP(c *fiber.Ctx) *string {
 		return nil
 	}
 	return &ip
+}
+
+func (s *Server) handleRefresh(c *fiber.Ctx) error {
+
+	var req dto.RefreshRequest
+	if err := c.BodyParser(&req); err != nil {
+		return writeError(c, fiber.StatusBadRequest, "invlid_body", "request body is not a valid JSON")
+	}
+
+	if err := s.validate.Struct(req); err != nil {
+		return writeValidationError(c, err)
+	}
+
+	deviceID := optionalHeader(c, "X-Device-Id")
+	ip := clientIP(c)
+
+	// Rotate: validate the presented token, mark it used, mint a
+	// replacement in the same family. Detects reuse (theft) internally.
+
+	issued, err := s.sessionService.Rotate(c.Context(), req.RefreshToken, deviceID, ip)
+
+	if err != nil {
+		switch  {
+		case errors.Is(err, session.ErrTokenResused):
+			// The whole family was just revoked inside Rotate. Return the
+			// same 401 as any token - we do not reveal to the caller that was detected.
+			return writeError(c, fiber.StatusUnauthorized, "invalid_token", "refresh token is invalid")
+		case errors.Is(err, session.ErrInvalidRefreshToken):
+			return writeError(c, fiber.StatusUnauthorized, "invalid_token", "refresh token is invalid")
+		default:
+			log.Printf("refresh failed: %v", err)
+			return writeError(c, fiber.StatusInternalServerError, "internal_error", "something went wrong")
+		}
+	}
+	// The rotated token belongs to the same user; we need their role for
+	// the new access token. Fetch the user fresh.
+	u, err := s.userService.GetByID(c.Context(), issued.Session.UserID)
+	if err != nil {
+		log.Printf("refresh: get user: %v", err)
+		return writeError(c, fiber.StatusInternalServerError, "internal_server", "something went wrong")
+	}
+
+	accessToken, err := s.tokenManager.GenerateAccessToken(u.ID, string(u.Role))
+
+	return c.JSON(dto.TokenResponse{
+		AccessToken: accessToken,
+		RefreshToken: issued.RawToken,
+		TokenType: "Bearer",
+		ExpiresIn: 900,
+	})
 }
 

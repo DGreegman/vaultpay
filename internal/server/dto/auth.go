@@ -42,3 +42,8 @@ type TokenResponse struct {
 	ExpiresIn    int    `json:"expires_in"` // access token lifetime, seconds
 }
 
+// RefreshRequest is the body for POST /v1/auth/refresh.
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+

@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var ErrNotFound = errors.New("session: mot found")
+var ErrNotFound = errors.New("session: not found")
 
 type PostgresRepository struct {
 	pool *pgxpool.Pool
@@ -43,7 +44,7 @@ func (r *PostgresRepository) Create(ctx context.Context, s *Session) error {
 func (r *PostgresRepository) GetByTokenHash(ctx context.Context, hash string) (*Session, error) {
 	const q = `
 			SELECT id, user_id, token_family_id, token_hash, used, revoked,
-		       device_id, ip_address, expires_at, created_at
+		       device_id, ip_address::text, expires_at, created_at
 			FROM sessions WHERE token_hash = $1`
 
 	var s Session 
@@ -63,16 +64,17 @@ func (r *PostgresRepository) GetByTokenHash(ctx context.Context, hash string) (*
 }
 
 func (r *PostgresRepository) MarkUsed(ctx context.Context, id uuid.UUID) error {
-	_, err := r.pool.Exec(ctx, `UPDATE sessions SET used = true WHERE ID = $1`, id)
+	tag, err := r.pool.Exec(ctx, `UPDATE sessions SET used = true WHERE id = $1`, id)
 
 	if err != nil {
-		fmt.Errorf("session: mark useed: %w", err)
+		return fmt.Errorf("session: mark useed: %w", err)
 	}
+	log.Printf("MarkUsed id=%s rowsAffected=%d", id, tag.RowsAffected())
 	return nil
 }
 
 func (r *PostgresRepository) RevokeFamily(ctx context.Context, familyID uuid.UUID) error {
-	_, err := r.pool.Exec(ctx, `UPDATE sessions SET revoked = true WHERE token_fmaily = $1`, familyID)
+	_, err := r.pool.Exec(ctx, `UPDATE sessions SET revoked = true WHERE token_family_id = $1`, familyID)
 
 	if err != nil {
 		return fmt.Errorf("session: revoke family %w", err)
@@ -82,7 +84,7 @@ func (r *PostgresRepository) RevokeFamily(ctx context.Context, familyID uuid.UUI
 
 
 func (r *PostgresRepository) RevokeByTokenHash(ctx context.Context, hash string) error {
-	_, err := r.pool.Exec(ctx, `UPDATE sessions SET rovoked = ture WHERE token_hash = $1`)
+	_, err := r.pool.Exec(ctx, `UPDATE sessions SET revoked = true WHERE token_hash = $1`, hash)
 	if err != nil {
 		return fmt.Errorf("session: revoke %w", err)
 	}

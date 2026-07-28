@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -69,7 +70,9 @@ func (s *Service) Rotate(ctx context.Context, rawToken string, deviceID, ip *str
 	// logging everyone out. The real user re-logs-in safely; the
 	// attacker is locked out.
 	if sess.Used {
-		_ = s.repo.RevokeFamily(ctx, sess.TokenFamilyID)
+		if err := s.repo.RevokeFamily(ctx, sess.TokenFamilyID); err != nil {
+			log.Printf("RevokeFamily failed: %v", err)
+		}
 
 		return nil, ErrTokenResused
 	}
@@ -79,6 +82,13 @@ func (s *Service) Rotate(ctx context.Context, rawToken string, deviceID, ip *str
 
 	if time.Now().After(sess.ExpiresAt){
 		return nil, ErrInvalidRefreshToken
+	}
+
+	// Valid, unused, unrevoked token: mark it used before minting its
+	// replacement. This is what arms the theft tripwire — a token that
+	// is presented again after this point trips the sess.Used check above.
+	if err := s.repo.MarkUsed(ctx, sess.ID); err != nil {
+		return nil, err
 	}
 
 	return s.mint(ctx, sess.UserID, sess.TokenFamilyID, deviceID, ip)

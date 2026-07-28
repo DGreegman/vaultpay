@@ -93,6 +93,12 @@ func(s *Service) Authenticate(ctx context.Context, email, password string) (*Use
 	return u, nil
 }
 
+// GetByID fetches a user by ID
+func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
+	return s.repo.GetByID(ctx, id)
+
+}
+
 // normalizeEmail trims whitespace. Case-insensitivity is handled by the
 // citext column in the database, so we do not lowercase here — but we do
 // trim, since a trailing space is never intended.
