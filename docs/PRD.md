@@ -266,16 +266,11 @@ This is the heart of the project — the part most portfolio projects skip.
 
 - The sum of all wallet balances = pooled account balance (the **vaultpay account**)
 
-- **Deposit**: cash up, debt up when a user sends deposits into the pool cash of vautpay the amount increases by the amount deposited and also the debt is also increased. 
-
-- **Withdrawal**: cash down, debt down when a user withdraws money go down in vaultpay's account(pool cash) and money owned also goes down too. 
-
-
-- **Transfer**: cash unchanged, debt redistributed this is because transfer happens within the Vaultpay, no money leaves the vaultpay building so pool cash isn't affected everything remains the same
+> Deposit — cash up, debt up: when a user deposits, **VaultPay**'s pooled cash increases by that amount, and because the money isn't ours, what we owe that user increases by the same amount. However, a withdrawal means cash down, debt down when a user withdraws money go down in **Vaultpay**'s account(pooled cash) and money owed also goes down too. Transfers makes cash unchanged, debt redistributed accross wallets in **Vaultpay** this is because transfer happens within the **Vaultpay**, no money leaves the **Vaultpay** building so pool cash isn't affected everything remains the same
 
 - A wallet is a liability — money you owe, not money you have, because each wallet is tied to a user which have each users money the more the wallet the more the moeny you owe the users
 
-- Debit and credit are just the left and right columns; every event writes to both
+- Debit and credit are just the left and right columns; every event writes to both, assets increase with a debit, liabilities increase with a credit
 - Every safety mechanism in the system exists to defend that one equation
 
 - **Balances are derived, not stored as truth** — a wallet's balance is a projection of its ledger entries, refreshed on write and rebuildable from scratch at any time.
@@ -283,7 +278,11 @@ This is the heart of the project — the part most portfolio projects skip.
 
 > **🇳🇬 Local.** Nigeria's currency has 100 kobo to ₦1. VaultPay stores ₦5,000 as the integer `500000` (kobo). This isn't pedantry: floating-point ₦ arithmetic drifts, and in a ledger, a fraction of a kobo that doesn't reconcile is a **failed audit**. Paystack, Flutterwave, and NIBSS all transact in kobo integers for the same reason.
 
+> if VaultPay's database were lost, the money would still be sitting at GTB — but nobody would know whose it was.
+
 > **📣 Post.** *"Why does every real fintech store ₦5,000 as the number 500000? Because 0.1 + 0.2 ≠ 0.3 in a computer — and in a ledger, that rounding error is money that vanishes. 💧"*
+
+
 
 ### 8.2 Idempotency
 
