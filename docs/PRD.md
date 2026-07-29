@@ -258,7 +258,25 @@ This is the heart of the project — the part most portfolio projects skip.
 
 ### 8.1 Double-entry accounting
 
+
+
 **No endpoint or service is ever permitted to run `balance -= amount` directly.** Every movement of money creates at least **two ledger entries — a debit and a credit — that net to zero.** A ₦5,000 transfer from Wallet A to Wallet B posts a 5,000 debit against A and a 5,000 credit to B, both inside one atomic operation.
+
+- VaultPay holds one real bank account let say GTB or Firstbank this only belongs to Vaultpay and what the bank sees; the database records who owns which slice in the users wallet
+
+- The sum of all wallet balances = pooled account balance (the **vaultpay account**)
+
+- **Deposit**: cash up, debt up when a user sends deposits into the pool cash of vautpay the amount increases by the amount deposited and also the debt is also increased. 
+
+- **Withdrawal**: cash down, debt down when a user withdraws money go down in vaultpay's account(pool cash) and money owned also goes down too. 
+
+
+- **Transfer**: cash unchanged, debt redistributed this is because transfer happens within the Vaultpay, no money leaves the vaultpay building so pool cash isn't affected everything remains the same
+
+- A wallet is a liability — money you owe, not money you have, because each wallet is tied to a user which have each users money the more the wallet the more the moeny you owe the users
+
+- Debit and credit are just the left and right columns; every event writes to both
+- Every safety mechanism in the system exists to defend that one equation
 
 - **Balances are derived, not stored as truth** — a wallet's balance is a projection of its ledger entries, refreshed on write and rebuildable from scratch at any time.
 - **All money is integers in the smallest unit (kobo/cents)** — never floating point, to avoid rounding drift.
