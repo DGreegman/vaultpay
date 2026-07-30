@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,7 +21,7 @@ const refreshTokenTTL = 7 * 24 * time.Hour
 
 var (
 	ErrInvalidRefreshToken = errors.New("session: invalid refresh token")
-	ErrTokenResused        = errors.New("session: token reuse detected")
+	ErrTokenReused         = errors.New("session: token reuse detected")
 )
 
 type Service struct {
@@ -55,73 +54,79 @@ func (s *Service) Rotate(ctx context.Context, rawToken string, deviceID, ip *str
 
 	hash := hashToken(rawToken)
 
-	sess, err := s.repo.GetByTokenHash(ctx, hash)
+	// Read the immutable identity fields (user, family) so we can build the
+	// replacement. These never change for a given token_hash, so staleness
+	// is impossible here. The mutable state is verified atomically below.
+	current, err := s.repo.GetByTokenHash(ctx, hash)
+	if err != nil {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	raw, next, err := s.newSession(current.UserID, current.TokenFamilyID, deviceID, ip)
 
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return nil, ErrInvalidRefreshToken
-		}
+		return  nil, err
+	}
+
+	// Claim the old token and persist the one atomically. this is the only step that authorizes the rotation 
+	err = s.repo.ConsumeAndCreate(ctx, hash, next)
+	if err == nil {
+		return &Issued{RawToken: raw, Session: next}, nil
+	}
+	if !errors.Is(err, ErrNotConsumable) {
 		return nil, err
 	}
 
-	// THEFT DETECTION: a token that was already used is being presented
-	// again. Either the legitimate holder or an attacker has a stale
-	// token — we cannot tell which, so we revoke the ENTIRE family,
-	// logging everyone out. The real user re-logs-in safely; the
-	// attacker is locked out.
-	if sess.Used {
-		if err := s.repo.RevokeFamily(ctx, sess.TokenFamilyID); err != nil {
-			log.Printf("RevokeFamily failed: %v", err)
+	// Refused, Re-read for diagonisis - `current` is now known to be out of date, since something changed between it and the UPDATE
+	latest, getErr := s.repo.GetByTokenHash(ctx, hash)
+	if getErr != nil {
+		return nil, ErrInvalidRefreshToken
+	}
+	if latest.Used {
+		if err := s.repo.RevokeFamily(ctx, latest.TokenFamilyID); err != nil {
+			return nil, fmt.Errorf("session: revoke family: %w", err)
 		}
-
-		return nil, ErrTokenResused
+		return nil, ErrTokenReused
 	}
-	if sess.Revoked {
-		return nil, ErrInvalidRefreshToken
-	}
-
-	if time.Now().After(sess.ExpiresAt){
-		return nil, ErrInvalidRefreshToken
-	}
-
-	// Valid, unused, unrevoked token: mark it used before minting its
-	// replacement. This is what arms the theft tripwire — a token that
-	// is presented again after this point trips the sess.Used check above.
-	if err := s.repo.MarkUsed(ctx, sess.ID); err != nil {
-		return nil, err
-	}
-
-	return s.mint(ctx, sess.UserID, sess.TokenFamilyID, deviceID, ip)
-} 
+	// Revoked or expired - nothing suspicious just not valid
+	return nil, ErrInvalidRefreshToken
+}
 
 // Revoke kills a single refresh token (called at logout).
-func(s *Service) Revoke(ctx context.Context, rawToken string) error {
+func (s *Service) Revoke(ctx context.Context, rawToken string) error {
 	return s.repo.RevokeByTokenHash(ctx, hashToken(rawToken))
 }
 
-// mint generates a new random token, stores its hash in the given family,
-// and returns the raw token.
+// mint creates and persists a brand-new session. Used at login.
 func (s *Service) mint(ctx context.Context, userID, familyID uuid.UUID, deviceID, ip *string) (*Issued, error) {
-	raw, err := generateToken()
-
+	raw, sess, err := s.newSession(userID, familyID, deviceID, ip)
 	if err != nil {
-		return nil, err 
+		return nil, err
 	}
+	if err := s.repo.Create(ctx, sess); err != nil {
+		return nil, err
+	}
+	return &Issued{RawToken: raw, Session: sess}, nil	
+}
 
-	sess := &Session{
-		ID: uuid.Must(uuid.NewV7()),
+// newSession builds an unsaved session and its raw token. It touches no
+// database — persisting it is the caller's job, because login and rotation
+// need to persist it in different ways.
+func (s *Service) newSession(userID, familyID uuid.UUID, deviceID, ip *string) (string, *Session, error) {
+	raw, err := generateToken()
+	if err != nil {
+		return "", nil, err
+	}
+	return raw, &Session{
+		ID:		uuid.Must(uuid.NewV7()),
 		UserID: userID,
 		TokenFamilyID: familyID,
 		TokenHash: hashToken(raw),
 		DeviceID: deviceID,
 		IPAddress: ip,
 		ExpiresAt: time.Now().Add(refreshTokenTTL),
-	}
 
-	if err := s.repo.Create(ctx, sess); err != nil {
-		return nil, err
-	}
-	return &Issued{RawToken: raw, Session: sess}, nil
+	}, nil
 }
 
 // generateToken produces 256 bits of cryptographic randomness as a

@@ -28,7 +28,7 @@ type Session struct {
 type Repository interface {
 	Create(ctx context.Context, s *Session) error
 	GetByTokenHash(ctx context.Context, hash string) (*Session, error)
-	MarkUsed(ctx context.Context, id uuid.UUID) error 
+	ConsumeAndCreate(ctx context.Context, oldHash string, next *Session)  error 
 	RevokeFamily(ctx context.Context, familyID uuid.UUID) error 
 	RevokeByTokenHash(ctx context.Context, hash string) error
 }

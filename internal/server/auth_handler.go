@@ -146,7 +146,7 @@ func (s *Server) handleRefresh(c *fiber.Ctx) error {
 
 	if err != nil {
 		switch  {
-		case errors.Is(err, session.ErrTokenResused):
+		case errors.Is(err, session.ErrTokenReused):
 			// The whole family was just revoked inside Rotate. Return the
 			// same 401 as any token - we do not reveal to the caller that was detected.
 			return writeError(c, fiber.StatusUnauthorized, "invalid_token", "refresh token is invalid")
