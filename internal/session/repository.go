@@ -123,10 +123,3 @@ func (r *PostgresRepository) RevokeFamily(ctx context.Context, familyID uuid.UUI
 	return nil
 }
 
-func (r *PostgresRepository) RevokeByTokenHash(ctx context.Context, hash string) error {
-	_, err := r.pool.Exec(ctx, `UPDATE sessions SET revoked = true WHERE token_hash = $1`, hash)
-	if err != nil {
-		return fmt.Errorf("session: revoke %w", err)
-	}
-	return nil
-}

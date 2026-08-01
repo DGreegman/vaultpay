@@ -90,6 +90,10 @@ func(s *Service) Authenticate(ctx context.Context, email, password string) (*Use
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil{
 		return nil, ErrInvalidCredentials
 	}
+
+	if err := u.CanAuthenticate(); err != nil {
+		return nil, err
+	}
 	return u, nil
 }
 

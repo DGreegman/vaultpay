@@ -92,11 +92,6 @@ func (s *Service) Rotate(ctx context.Context, rawToken string, deviceID, ip *str
 	return nil, ErrInvalidRefreshToken
 }
 
-// Revoke kills a single refresh token (called at logout).
-func (s *Service) Revoke(ctx context.Context, rawToken string) error {
-	return s.repo.RevokeByTokenHash(ctx, hashToken(rawToken))
-}
-
 // mint creates and persists a brand-new session. Used at login.
 func (s *Service) mint(ctx context.Context, userID, familyID uuid.UUID, deviceID, ip *string) (*Issued, error) {
 	raw, sess, err := s.newSession(userID, familyID, deviceID, ip)
@@ -129,6 +124,27 @@ func (s *Service) newSession(userID, familyID uuid.UUID, deviceID, ip *string) (
 	}, nil
 }
 
+// RevokeFamily kills an entire token linage, called when an account stops 
+// being allowed to authenticate or when theft is detected
+func (s *Service) RevokeFamily(ctx context.Context, familyID uuid.UUID) error  {
+
+	return s.repo.RevokeFamily(ctx, familyID)
+	
+}
+
+// Logout revokes the whole family the presented refresh token belongs to ending that device's login lineage. 
+// it is idempotent:an uknowntoken is a no-op, not an error
+func(s *Service) Logout(ctx context.Context, rawToken string) error {
+	sess, err := s.repo.GetByTokenHash(ctx, hashToken(rawToken))
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("session: logout: %w", err)
+	}
+
+	return s.repo.RevokeFamily(ctx, sess.TokenFamilyID)
+}
 // generateToken produces 256 bits of cryptographic randomness as a
 // URL-safe string. crypto/rand, never math/rand — a predictable token
 // is a forgeable token.

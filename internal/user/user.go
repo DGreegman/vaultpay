@@ -2,10 +2,24 @@ package user
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// ErrAccountNotActive means the credentials were correct but the account
+// is not permitted to authenticate-suspended, deleted or forzen
+var ErrAccountNotActive = errors.New("user: account is not active")
+
+// CanAuthenticate reports whether this user may obtain tokens, it lives on
+// dormain type rather than handler so that login and refresh cannot drift apart as auth parts multiply
+func (u *User) CanAuthenticate() error {
+	if u.Status != StatusActive {
+		return ErrAccountNotActive
+	}
+	return nil
+}
 
 // Role and Status mirror the CHECK constraint and enum in the database.
 // Defining them as typed constants here means the compiler helps us use

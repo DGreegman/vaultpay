@@ -47,3 +47,7 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
+// LogoutRequest is the body for POST /v1/auth/logout
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}

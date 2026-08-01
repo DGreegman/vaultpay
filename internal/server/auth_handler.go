@@ -74,10 +74,15 @@ func (s *Server) handleLogin(c *fiber.Ctx) error{
 	// 1. Verify Credentials (timing-safe, vague on failure)
 	u, err := s.userService.Authenticate(c.Context(), req.Email, req.Password)
 	if err != nil {
-		if errors.Is(err, user.ErrInvalidCredentials) {
-			return writeError(c, fiber.StatusUnauthorized, "invalid_credentials", "email or password is incorrect")
+		switch {
+		case errors.Is(err, user.ErrInvalidCredentials):
+			return writeError(c, fiber.StatusUnauthorized, "invalid_crendentials", "email or password is incorrect")
+		case errors.Is(err, user.ErrAccountNotActive):
+			return writeError(c, fiber.StatusForbidden, "account_not_active", "this account cannot sign in")
+		default:
+			log.Printf("login failed: %v", err)
+			return writeError(c, fiber.StatusInternalServerError, "internal_error", "something went wrong")
 		}
-		return writeError(c, fiber.StatusInternalServerError, "internal_error", "something went wrong")
 	}
 	
 	// 2. Mint the short-lived access token (stateless JWT)
@@ -162,10 +167,24 @@ func (s *Server) handleRefresh(c *fiber.Ctx) error {
 	u, err := s.userService.GetByID(c.Context(), issued.Session.UserID)
 	if err != nil {
 		log.Printf("refresh: get user: %v", err)
-		return writeError(c, fiber.StatusInternalServerError, "internal_server", "something went wrong")
+		return writeError(c, fiber.StatusInternalServerError, "internal_error", "something went wrong")
+	}
+
+	if err := u.CanAuthenticate(); err != nil {
+		// The account was suspended after this session was created. 
+		// we have already minted a replacement token inside Rotate, 
+		// so we revoke the whole family - otherwise that unissues token stays valid
+		if revokeErr := s.sessionService.RevokeFamily(c.Context(), issued.Session.TokenFamilyID); revokeErr != nil {
+			log.Printf("refresh: revoke family for inactive user %v", revokeErr)
+		}
+		return writeError(c, fiber.StatusForbidden, "account_not_active", "this account cannot sign in")
 	}
 
 	accessToken, err := s.tokenManager.GenerateAccessToken(u.ID, string(u.Role))
+	if err != nil {
+		log.Printf("refresh: generate access token: %v", err)
+		return writeError(c, fiber.StatusInternalServerError, "internal_error", "something went wrong")
+	}
 
 	return c.JSON(dto.TokenResponse{
 		AccessToken: accessToken,
@@ -173,5 +192,24 @@ func (s *Server) handleRefresh(c *fiber.Ctx) error {
 		TokenType: "Bearer",
 		ExpiresIn: 900,
 	})
+}
+
+func (s *Server) handleLogout(c *fiber.Ctx) error {
+	var req dto.LogoutRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return writeError(c, fiber.StatusBadRequest, "invalid_body", "request body is not a valid json")
+	}
+	if err := s.validate.Struct(req); err != nil {
+		return writeValidationError(c, err)
+	}
+
+	if err := s.sessionService.Logout(c.Context(), req.RefreshToken); err != nil {
+		log.Printf("logout failed: %v", err)
+		return writeError(c, fiber.StatusInternalServerError, "internal_error", "something went wrong")
+	}
+
+	// 204: it worked, and there's nothing to say about it.
+	return c.SendStatus(fiber.StatusNoContent)
 }
 

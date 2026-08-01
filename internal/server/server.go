@@ -59,6 +59,7 @@ func(s *Server) registerRoutes() {
 	auth.Post("/register", s.handleRegister)
 	auth.Post("/login", s.handleLogin)
 	auth.Post("/refresh", s.handleRefresh)
+	auth.Post("/logout", s.handleLogout)
 }
 
 // Listen starts the HTP server. It blocks until the server stops

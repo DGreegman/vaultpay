@@ -30,5 +30,4 @@ type Repository interface {
 	GetByTokenHash(ctx context.Context, hash string) (*Session, error)
 	ConsumeAndCreate(ctx context.Context, oldHash string, next *Session)  error 
 	RevokeFamily(ctx context.Context, familyID uuid.UUID) error 
-	RevokeByTokenHash(ctx context.Context, hash string) error
 }
