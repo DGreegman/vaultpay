@@ -7,6 +7,9 @@ import (
 	"github.com/DGreegman/vaultpay/internal/user"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	recoverer "github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -29,6 +32,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool, userService *user.Service, toke
 	app := fiber.New(fiber.Config{
 		AppName: 		"VaultPay",
 		DisableStartupMessage: true,
+		ErrorHandler: errorHandler,
 	})
 
 	validate := validator.New(validator.WithRequiredStructEnabled())
@@ -50,6 +54,15 @@ func New(cfg *config.Config, pool *pgxpool.Pool, userService *user.Service, toke
 // registerRoutes wires every HTTP route. Route live here so there
 // is exactly one place to answer "what does this service expose"
 func(s *Server) registerRoutes() {
+	// recover turns a panic into a 500 instead of dead process, It must be first, so it wraps every handler and every middleware after it
+	s.app.Use(recoverer.New(recoverer.Config{
+		EnableStackTrace: true,
+	}))
+	// requestID stamps every request with a UUID and echoes it in the X-Request-ID header, so a user's bug report maps to exact log lines
+	s.app.Use(requestid.New())
+	s.app.Use(logger.New(logger.Config{
+		Format: "${time} ${locals:requestid} ${status} ${method} ${path} ${latency}\n",
+	}))
 	s.app.Get("/healthz", s.handleHealthz)
 	s.app.Get("/readyz", s.handleReadyz)
 

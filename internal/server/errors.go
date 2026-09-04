@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"log"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
@@ -45,4 +46,40 @@ func writeValidationError(c *fiber.Ctx, err error) error {
 			Fields: fields,
 		},
 	})
+}
+
+// errorHandler is Fiber's last line of defence: anything a handler returns
+// as an error - including Fiber's own 404s and 405s - lands here and leaves
+// as our standard error shape.(PRD §13.1: one error shape everywhere).
+
+func errorHandler(c *fiber.Ctx, err error) error {
+	status := fiber.StatusInternalServerError
+	code := "internal_error"
+	message := "something went wrong"
+
+	var fe *fiber.Error 
+	if errors.As(err, &fe) {
+		status = fe.Code
+		code = httpErrorCode(status)
+		message = fe.Message
+	}else {
+		// Not a Fiber error means an unexpected one escape a handler,
+		// Log the detail: tell the cleient nothing 
+		log.Printf("undexpected error: %s %s: %v", c.Method(), c.Path(), err)
+	}
+	return writeError(c, status, code, message)
+}
+
+// httpErrorCode maps a status machine-readable code, so clients can switch on strings than on numbers
+func httpErrorCode(status int) string {
+	switch status {
+	case fiber.StatusNotFound:
+		return "not_found"
+	case fiber.StatusMethodNotAllowed:
+		return "method_not_allowed"
+	case fiber.StatusRequestEntityTooLarge:
+		return "request_too_large"
+	default: 
+		return "internal_error"
+	}
 }
