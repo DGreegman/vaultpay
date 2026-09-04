@@ -87,3 +87,9 @@ func (m *Manager) Verify(tokenString string) (*Claims, error){
 	
 }
 
+// AccessTokenTTL exposes the access-token lifetime so callers can report it to the clients without hardcoding a second copy of the number
+
+func (m *Manager) AccessTokenTTL() time.Duration {
+	return accessTokenTTL
+}
+

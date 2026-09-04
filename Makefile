@@ -1,4 +1,4 @@
-include .env
+-include .env
 export
 
 MIGRATIONS_DIR := migrations
@@ -7,6 +7,7 @@ BINARY         := bin/vaultpay
 .PHONY: help dev run build test test-race lint vet fmt tidy \
         docker-up docker-down docker-logs docker-reset \
         migrate-up migrate-down migrate-create migrate-version migrate-force \
+        db db-tables db-sql \
         setup clean
 
 ## help: show available targets
@@ -56,7 +57,7 @@ lint: fmt vet tidy
 
 ## docker-up: start postgres + redis
 docker-up:
-	docker compose up -d
+	docker compose up -d --wait
 
 ## docker-down: stop containers (keeps data)
 docker-down:
@@ -99,11 +100,21 @@ migrate-force:
 
 ## setup: bring up infra, wait, migrate
 setup: docker-up
-	@echo "waiting for postgres..."
-	@sleep 5
 	@$(MAKE) migrate-up
 	@echo "ready. run 'make dev'"
 
 ## clean: remove build artifacts
 clean:
 	rm -rf bin tmp
+
+## db: open a psql shell inside the postgres container
+db:
+	docker exec -it vaultpay-postgres psql -U vaultpay -d vaultpay
+
+## db-tables: list all tables
+db-tables:
+	@docker exec -i vaultpay-postgres psql -U vaultpay -d vaultpay -c '\dt'
+
+## db-sql: run a one-off query, e.g. make db-sql Q="select * from users limit 5"
+db-sql:
+	@docker exec -i vaultpay-postgres psql -U vaultpay -d vaultpay -c "$(Q)"

@@ -107,7 +107,7 @@ func (s *Server) handleLogin(c *fiber.Ctx) error{
 		AccessToken: accessToken,
 		RefreshToken: issueed.RawToken,
 		TokenType: "Bearer",
-		ExpiresIn: 900, // 15 mins
+		ExpiresIn: int(s.tokenManager.AccessTokenTTL().Seconds()),
 	})
 }
 
