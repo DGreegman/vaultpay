@@ -60,7 +60,7 @@ type User struct {
 // interface, never on the concrete Postgres implementation — so the
 // service can be tested with a fake, and the storage can change without
 // touching business logic.
-type Reposistory interface {
+type Repository interface {
 	Create(ctx context.Context, u *User) error 
 	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)

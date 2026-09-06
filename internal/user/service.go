@@ -26,10 +26,10 @@ var ErrInvalidCredentials = errors.New("user: invalid credentials")
 // Repository interface, so it can be tested with a fake implementation.
 
 type Service struct {
-	repo Reposistory
+	repo Repository
 }
 
-func NewService(repo Reposistory) *Service {
+func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 

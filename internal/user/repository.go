@@ -33,7 +33,7 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 // If a method signature drifts, the build fails here — not at some
 // call site far away.
 
-var _ Reposistory = (*PostgresRepository)(nil)
+var _ Repository = (*PostgresRepository)(nil)
 
 func (r *PostgresRepository) Create(ctx context.Context, u *User) error {
 	const q = `

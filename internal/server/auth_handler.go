@@ -96,7 +96,7 @@ func (s *Server) handleLogin(c *fiber.Ctx) error{
 
 	ip := clientIP(c)
 
-	issueed, err := s.sessionService.Issue(c.Context(), u.ID, deviceID, ip)
+	issued, err := s.sessionService.Issue(c.Context(), u.ID, deviceID, ip)
 
 	if err != nil {
 		return writeError(c, fiber.StatusInternalServerError, "internal_error", "something went wrong")
@@ -105,7 +105,7 @@ func (s *Server) handleLogin(c *fiber.Ctx) error{
 	// 4. Return both tokens.
 	return c.JSON(dto.TokenResponse{
 		AccessToken: accessToken,
-		RefreshToken: issueed.RawToken,
+		RefreshToken: issued.RawToken,
 		TokenType: "Bearer",
 		ExpiresIn: int(s.tokenManager.AccessTokenTTL().Seconds()),
 	})
@@ -134,7 +134,7 @@ func (s *Server) handleRefresh(c *fiber.Ctx) error {
 
 	var req dto.RefreshRequest
 	if err := c.BodyParser(&req); err != nil {
-		return writeError(c, fiber.StatusBadRequest, "invlid_body", "request body is not a valid JSON")
+		return writeError(c, fiber.StatusBadRequest, "invalid_body", "request body is not a valid JSON")
 	}
 
 	if err := s.validate.Struct(req); err != nil {
@@ -190,7 +190,7 @@ func (s *Server) handleRefresh(c *fiber.Ctx) error {
 		AccessToken: accessToken,
 		RefreshToken: issued.RawToken,
 		TokenType: "Bearer",
-		ExpiresIn: 900,
+		ExpiresIn: int(s.tokenManager.AccessTokenTTL().Seconds()),
 	})
 }
 
