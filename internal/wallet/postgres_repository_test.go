@@ -11,7 +11,6 @@ import (
 	"github.com/DGreegman/vaultpay/internal/db"
 	"github.com/DGreegman/vaultpay/internal/store"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
@@ -203,6 +202,80 @@ func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T){
 
 	repo := NewPostgresRepository(queries)
 	
+	testEmail := fmt.Sprintf("test-%s@example.com", userID.String())
+
+	_, err = pool.Exec(
+		ctx,
+		`INSERT INTO users(id, email, password_hash)
+		VALUES($1, $2, $3)`,
+		userID,
+		testEmail,
+		"test-password-hash",
+	)
+
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+
+	_, err = pool.Exec(
+		ctx,
+		`INSERT INTO wallets (id, user_id, currency)
+		VALUES($1, $2, $3)`,
+		walletID,
+		userID,
+		"NGN",
+	)
+
+	if err != nil {
+		t.Fatalf("failed to create test wallet: %v", err)
+	}
+
+	_, err = pool.Exec(
+		ctx,
+		`INSERT INTO wallet_balances (wallet_id, available_balance, held_balance)
+		VALUES ($1, $2, $3)`,
+		walletID,
+		walletBalance,
+		0,
+	)
+
+	if err != nil {
+		t.Fatalf("failed to create test wallet balance: %v", err)
+	}
+
+	t.Cleanup(func() {
+		_, err := pool.Exec(
+			ctx, 
+			`DELETE FROM wallet_balances WHERE wallet_id = $1`,
+			walletID,
+		)
+		if err != nil {
+			t.Errorf("failed to clean up wallet balance: %v", err)
+		}
+
+		_, err = pool.Exec(
+			ctx, 
+			`DELETE FROM wallets WHERE id = $1`,
+			walletID,
+		)
+
+		if err != nil {
+			t.Errorf("failed to cleanup wallet: %v", err)
+		}
+
+		_, err = pool.Exec(
+			ctx,
+			`DELETE FROM users WHERE id = $1`,
+			userID,
+		)
+
+		if err != nil {
+			t.Errorf("failed to cleanup user: %v", err)
+		}
+
+		pool.Close()
+	})
+	
 	tx1, err := pool.Begin(ctx)
 
 
@@ -216,5 +289,88 @@ func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T){
 	repo1 := repo.WithTx(tx1)
 
 	balance, err := repo1.GetBalanceForUpdate(ctx, walletID)
+
+	if err != nil {
+		t.Fatalf("failed to lock balance: %v", err)
+	}
+
+	if balance.WalletID != walletID {
+		t.Fatalf("expected wallet ID %s, got %s", walletID, balance.WalletID)
+	}
+
+	if balance.AvailableBalance != walletBalance {
+		t.Fatalf(
+			"expected available balance %d, got %d",
+			walletBalance,
+			balance.AvailableBalance,
+		)
+	}
+
+	tx2, err := pool.Begin(ctx)
+
+	if err != nil {
+		t.Fatalf("failed to open transaction 2: %v", err)
+	}
+
+	defer tx2.Rollback(ctx)
+
+	done := make(chan error)
+
+	go func() {
+		_, err := tx2.Exec(ctx, `
+		UPDATE wallet_balances
+		SET available_balance = available_balance - 1000
+		WHERE wallet_id = $1
+		`, walletID)
+
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("transaction 2 completed before transaction 1 commited, err: %v", err)
+	
+	case <-time.After(100 * time.Millisecond):
+		// Tx2 is still waitng for the lock, which is expected behavior.
+	}
+
+	err = tx1.Commit(ctx)
+
+	if err != nil {
+		t.Fatalf("failed to commit transaction 1: %v", err)
+	}
+
+	err = <-done
+	
+	if err != nil {
+		t.Fatalf("transaction 2 failed: %v", err)
+	}
+
+	err = tx2.Commit(ctx)
+
+	if err != nil {
+		t.Fatalf("failed to commit transaction 2: %v", err)
+	}
+
+	var finalBalance int64 
+
+	err = pool.QueryRow(ctx,
+		`SELECT available_balance
+		FROM wallet_balances
+		WHERE wallet_id = $1`,
+		walletID,
+	).Scan(&finalBalance)
+
+	if err != nil {
+		t.Fatalf("failed to read final balance: %v", err)
+	}
+
+	if finalBalance != walletBalance - 1000 {
+		t.Fatalf(
+			"expected final balance %d, got %d",
+			walletBalance-1000,
+			finalBalance,
+		)
+	}
 	
 }
