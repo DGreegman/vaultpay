@@ -50,7 +50,7 @@ func TestPostgresRepository_GetBalanceForUpdate(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		_, err := pool.Exec(ctx, `DELETE FROM wallet_balances WHERE wallet_id = $1`,walletID)
+		_, err := pool.Exec(ctx, `DELETE FROM wallet_balances WHERE wallet_id = $1`, walletID)
 
 		if err != nil {
 			t.Errorf("failed to cleanup wallet balance: %v", err)
@@ -68,9 +68,8 @@ func TestPostgresRepository_GetBalanceForUpdate(t *testing.T) {
 		pool.Close()
 	})
 
-
 	testEmail := fmt.Sprintf("test-%s@example.com", userID.String())
-	_, err = pool.Exec(ctx, 
+	_, err = pool.Exec(ctx,
 		`INSERT INTO users (
 			id,
 			email,
@@ -83,7 +82,7 @@ func TestPostgresRepository_GetBalanceForUpdate(t *testing.T) {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
-	_, err = pool.Exec(ctx, 
+	_, err = pool.Exec(ctx,
 		`INSERT INTO wallets (
 		id,
 		user_id,
@@ -95,7 +94,7 @@ func TestPostgresRepository_GetBalanceForUpdate(t *testing.T) {
 		t.Fatalf("failed to create test wallet: %v", err)
 	}
 
-	_, err = pool.Exec(ctx, 
+	_, err = pool.Exec(ctx,
 		`INSERT INTO wallet_balances (
 			wallet_id,
 			available_balance,
@@ -115,11 +114,9 @@ func TestPostgresRepository_GetBalanceForUpdate(t *testing.T) {
 
 	balance, err := repo.GetBalanceForUpdate(ctx, walletID)
 
-	
 	if err != nil {
 		t.Fatalf("failed to get wallet balance: %v", err)
 	}
-
 
 	if balance.WalletID != walletID {
 		t.Fatalf("expected wallet ID %v, got %v", walletID, balance.WalletID)
@@ -136,10 +133,10 @@ func TestPostgresRepository_GetBalanceForUpdate(t *testing.T) {
 	if !balance.UpdatedAt.Equal(updatedAt) {
 		t.Fatalf("expected updated %v, got %v", updatedAt, balance.UpdatedAt)
 	}
-	
+
 }
 
-func TestPostgresRepository_GetBalanceForUpdate_NotFound(t *testing.T){
+func TestPostgresRepository_GetBalanceForUpdate_NotFound(t *testing.T) {
 	ctx := context.Background()
 	walletID := uuid.New()
 
@@ -148,7 +145,7 @@ func TestPostgresRepository_GetBalanceForUpdate_NotFound(t *testing.T){
 		t.Fatalf("failed to load file .env: %v", err)
 	}
 	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == ""{
+	if databaseURL == "" {
 		t.Fatalf("DATABASE_URL is required")
 	}
 
@@ -159,31 +156,28 @@ func TestPostgresRepository_GetBalanceForUpdate_NotFound(t *testing.T){
 
 	defer pool.Close()
 
-	
-
 	queries := store.New(pool)
 	repo := NewPostgresRepository(queries)
 
 	balance, err := repo.GetBalanceForUpdate(ctx, walletID)
 
 	if !errors.Is(err, ErrNotFound) {
-    	t.Fatalf("expected ErrNotFound, got %v", err)
+		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 
 	if balance != nil {
 		t.Fatalf("expected nil balance, got %v", err)
 	}
-} 
+}
 
-
-func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T){
+func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
 	walletID := uuid.New()
 	walletBalance := int64(60000)
-	
+
 	err := godotenv.Load("../../.env")
-	
+
 	if err != nil {
 		t.Fatalf("failed to load .env: %v", err)
 	}
@@ -194,14 +188,13 @@ func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T){
 	}
 	pool, err := db.New(ctx, db.DefaultConfig(databaseURL))
 
-
 	if err != nil {
 		t.Fatalf("failed to create db pool: %v", err)
 	}
 	queries := store.New(pool)
 
 	repo := NewPostgresRepository(queries)
-	
+
 	testEmail := fmt.Sprintf("test-%s@example.com", userID.String())
 
 	_, err = pool.Exec(
@@ -245,7 +238,7 @@ func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T){
 
 	t.Cleanup(func() {
 		_, err := pool.Exec(
-			ctx, 
+			ctx,
 			`DELETE FROM wallet_balances WHERE wallet_id = $1`,
 			walletID,
 		)
@@ -254,7 +247,7 @@ func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T){
 		}
 
 		_, err = pool.Exec(
-			ctx, 
+			ctx,
 			`DELETE FROM wallets WHERE id = $1`,
 			walletID,
 		)
@@ -275,14 +268,12 @@ func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T){
 
 		pool.Close()
 	})
-	
-	tx1, err := pool.Begin(ctx)
 
+	tx1, err := pool.Begin(ctx)
 
 	if err != nil {
 		t.Fatalf("failed to begin transaction 1: %v", err)
 	}
-
 
 	defer tx1.Rollback(ctx)
 
@@ -329,7 +320,7 @@ func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T){
 	select {
 	case err := <-done:
 		t.Fatalf("transaction 2 completed before transaction 1 commited, err: %v", err)
-	
+
 	case <-time.After(100 * time.Millisecond):
 		// Tx2 is still waitng for the lock, which is expected behavior.
 	}
@@ -341,7 +332,7 @@ func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T){
 	}
 
 	err = <-done
-	
+
 	if err != nil {
 		t.Fatalf("transaction 2 failed: %v", err)
 	}
@@ -352,7 +343,7 @@ func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T){
 		t.Fatalf("failed to commit transaction 2: %v", err)
 	}
 
-	var finalBalance int64 
+	var finalBalance int64
 
 	err = pool.QueryRow(ctx,
 		`SELECT available_balance
@@ -365,12 +356,289 @@ func TestPostgresRepository_GetBalanceForUpdate_LocksRow(t *testing.T){
 		t.Fatalf("failed to read final balance: %v", err)
 	}
 
-	if finalBalance != walletBalance - 1000 {
+	if finalBalance != walletBalance-1000 {
 		t.Fatalf(
 			"expected final balance %d, got %d",
 			walletBalance-1000,
 			finalBalance,
 		)
 	}
-	
+
+}
+
+func TestPostgresRepository_GetWalletForUpdate(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.New()
+	walletID := uuid.New()
+
+	err := godotenv.Load("../../.env")
+
+	if err != nil {
+		t.Fatalf("failed to load .env: %v", err)
+	}
+
+	databaseURL := os.Getenv("DATABASE_URL")
+
+	if databaseURL == "" {
+		t.Fatalf("DATABASE_URL is required")
+	}
+
+	pool, err := db.New(ctx, db.DefaultConfig(databaseURL))
+
+	if err != nil {
+		t.Fatalf("failed to create db pool: %v", err)
+	}
+
+	queries := store.New(pool)
+
+	repo := NewPostgresRepository(queries)
+
+	testEmail := fmt.Sprintf("test-%s@example.com", userID.String())
+
+	_, err = pool.Exec(ctx, `INSERT INTO users(id, email, password_hash) VALUES($1, $2, $3)`, userID, testEmail, "test-password-hash")
+
+	if err != nil {
+		t.Fatalf("failed to create test user %v", err)
+	}
+
+	_, err = pool.Exec(
+		ctx,
+		`INSERT INTO wallets(id, user_id, currency, status)
+		VALUES($1, $2, $3, $4)`, walletID, userID, "NGN", "active",
+	)
+
+	if err != nil {
+		t.Fatalf("failed to create test wallet %v", err)
+	}
+
+	t.Cleanup(func() {
+		_, err := pool.Exec(
+			ctx,
+			`DELETE FROM wallets WHERE id = $1`,
+			walletID,
+		)
+		if err != nil {
+			t.Errorf("failed to cleanup wallet: %v", err)
+		}
+
+		_, err = pool.Exec(
+			ctx,
+			`DELETE FROM users WHERE id = $1`,
+			userID,
+		)
+		if err != nil {
+			t.Errorf("failed to cleanup user: %v", err)
+		}
+
+		pool.Close()
+	})
+
+	wallet, err := repo.GetWalletForUpdate(ctx, walletID)
+
+	if err != nil {
+		t.Fatalf("failed to get wallet: %v", err)
+	}
+
+	if wallet.ID != walletID {
+		t.Fatalf("expected wallet ID %s, got %s", walletID, wallet.ID)
+	}
+
+	if wallet.UserID != userID {
+		t.Fatalf("expected user ID %s, bot %s", userID, wallet.UserID)
+	}
+
+	if wallet.Currency != CurrencyNGN {
+		t.Fatalf("expected currency %s, got %s", CurrencyNGN, wallet.Currency)
+	}
+
+	if wallet.Status != StatusActive {
+		t.Fatalf("expected status %s, got %s", StatusActive, wallet.Status)
+	}
+
+}
+
+func TestPostgresRepository_GetWalletForUpdate_NotFound(t *testing.T) {
+	ctx := context.Background()
+
+	err := godotenv.Load("../../.env")
+	if err != nil {
+		t.Fatalf("failed to load .env: %v", err)
+	}
+
+	databaseURL := os.Getenv("DATABASE_URL")
+
+	if databaseURL == "" {
+		t.Fatalf("DATABASE_URL is required")
+	}
+
+	pool, err := db.New(ctx, db.DefaultConfig(databaseURL))
+	if err != nil {
+		t.Fatalf("failed to create db pool: %v", err)
+	}
+
+	t.Cleanup(func() {
+		pool.Close()
+	})
+
+	repo := NewPostgresRepository(store.New(pool))
+
+	_, err = repo.GetBalanceForUpdate(ctx, uuid.New())
+	if err == nil {
+		t.Fatalf("expected err, got nil")
+	}
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+
+}
+
+func TestPostgresRepository_GetWalletForUpdate_LocksRow(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.New()
+	walletID := uuid.New()
+
+	err := godotenv.Load("../../.env")
+
+	if err != nil {
+		t.Fatalf("failed to load .env file: %v", err)
+	}
+
+	databaseURL := os.Getenv("DATABASE_URL")
+
+	if databaseURL == "" {
+		t.Fatalf("DATABASE_URL is required")
+	}
+
+	pool, err := db.New(ctx, db.DefaultConfig(databaseURL))
+
+	if err != nil {
+		t.Fatalf("failed to create db pool %v", err)
+	}
+
+	queries := store.New(pool)
+
+	repo := NewPostgresRepository(queries)
+
+	testEmail := fmt.Sprintf("test-%s@example.com", userID.String())
+
+	_, err = pool.Exec(
+		ctx,
+		`INSERT INTO users(id, email, password_hash) 
+		VALUES($1, $2, $3)`, userID, testEmail, "test-password-hash",
+	)
+
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+
+	_, err = pool.Exec(
+		ctx,
+		`INSERT INTO wallets(id, user_id, currency, status)
+		VALUES($1, $2, $3, $4)`,
+		walletID, userID, "NGN", "active",
+	)
+
+	if err != nil {
+		t.Fatalf("failed to create test wallet: %v", err)
+	}
+
+	t.Cleanup(func() {
+
+		_, err := pool.Exec(
+			ctx,
+			`DELETE from wallets WHERE id = $1`,
+			walletID,
+		)
+
+		if err != nil {
+			t.Errorf("failed to cleanup wallet: %v", err)
+		}
+
+		_, err = pool.Exec(
+			ctx,
+			`DELETE from users WHERE id = $1`,
+			userID,
+		)
+		if err != nil {
+			t.Errorf("failed to cleanup user: %v", err)
+		}
+	})
+
+	tx1, err := pool.Begin(ctx)
+
+	if err != nil {
+		t.Fatalf("failed to created a wallet One transaction: %v", err)
+	}
+
+	defer tx1.Rollback(ctx)
+
+	repo1 := repo.WithTx(tx1)
+
+	wallet, err := repo1.GetWalletForUpdate(ctx, walletID)
+
+	if err != nil {
+		t.Fatalf("failed to lock wallet: %v", err)
+	}
+
+	if wallet.ID != walletID {
+		t.Fatalf("expected wallet ID %s, got %s", walletID, wallet.ID)
+	}
+
+	if wallet.UserID != userID {
+		t.Fatalf("expected wallet user ID %s, got %s", userID, wallet.UserID)
+	}
+
+	if wallet.Currency != CurrencyNGN {
+		t.Fatalf("expected wallet currency %s, got %s", CurrencyNGN, wallet.Currency)
+	}
+
+	if wallet.Status != StatusActive {
+		t.Fatalf("expected wallet status %s, got %s", StatusActive, wallet.Status)
+	}
+
+	tx2, err := pool.Begin(ctx)
+
+	if err != nil {
+		t.Fatalf("failed to create transaction for second wallet: %v", err)
+	}
+
+	defer tx2.Rollback(ctx)
+
+	done := make(chan error)
+
+	go func() {
+		_, err := tx2.Exec(
+			ctx,
+			`UPDATE wallets SET updated_at = now() WHERE id = $1`,
+			walletID,
+		)
+		done <- err
+	}()
+
+	select {
+
+	case err := <-done:
+		t.Fatalf("transaction 2 completed before transaction 1 commited, err: %v", err)
+
+	case <-time.After(100 * time.Millisecond):
+		// Tx2 is still waitng for the lock, which is expected behavior.
+	}
+
+	err = tx1.Commit(ctx)
+
+	if err != nil {
+		t.Fatalf("failed to commit transaction of wallet 1: %v", err)
+	}
+
+	err = <-done
+
+	if err != nil {
+		t.Fatalf("transaction 2 failed: %v", err)
+	}
+
+	err = tx2.Commit(ctx)
+
+	if err != nil {
+		t.Fatalf("failed to commit transaction of wallet 2: %v", err)
+	}
 }

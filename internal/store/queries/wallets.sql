@@ -16,3 +16,14 @@ RETURNING
     status,
     created_at,
     updated_at;
+
+
+-- name: GetWalletForUpdate :one
+SELECT
+    id,
+    user_id,
+    currency,
+    status
+FROM wallets
+WHERE id = $1
+FOR UPDATE;
